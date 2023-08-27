@@ -1,0 +1,83 @@
+version: '3.1'
+
+# x-common-vars:
+#   - &dzn dr_zookeeper
+
+volumes:
+  dr_click1:
+  dr_click2:
+
+networks:
+  dr_click:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: ${NETWORK_MASK}.0/16
+         gateway: ${NETWORK_MASK}.1
+
+services:
+
+  dr_zookeeper:
+    image: ${ZOOKEEPER_IMAGE}
+    container_name: dr_zookeeper
+    hostname: dr_zookeeper
+    networks:
+      dr_click:
+        ipv4_address: ${NETWORK_MASK}.8
+
+  dr_click1: &template
+    # image: ${CLICKHOUSE_IMAGE}
+    build:
+      context: .
+      args:
+          CLICKHOUSE_IMAGE: ${CLICKHOUSE_IMAGE}
+    depends_on:
+      - dr_zookeeper
+
+    entrypoint: [ 'sh' ]
+    command: [ '/tmp/tmpl/wrap.entrypoint.sh' ]
+    user: ${CLICK_USER}
+    env_file: .env
+    
+    container_name: dr_click1
+    hostname: dr_click1
+    
+    environment:
+      REPLICA: 1
+      SHARD: 1
+      
+    volumes:
+      - ./config/:/tmp/tmpl/
+      - ./tmp/dr_click1/config/:/etc/clickhouse-server/
+      - dr_click1:/var/lib/clickhouse/
+      - ./tmp/dr_click1/logs:/var/log/clickhouse-server/
+      - ./init/:/docker-entrypoint-initdb.d/
+    ports: 
+      - 18123:8123 
+      - 19000:9000
+    networks:
+      dr_click:
+        ipv4_address: ${NETWORK_MASK}.2
+    
+
+  dr_click2:
+    <<: *template
+    container_name: dr_click2
+    hostname: dr_click2
+    
+    environment:
+      REPLICA: 2
+      SHARD: 1
+    
+    volumes:
+      - ./config/:/tmp/tmpl/
+      - ./tmp/dr_click2/config/:/etc/clickhouse-server/
+      - dr_click2:/var/lib/clickhouse/
+      - ./tmp/dr_click2/logs:/var/log/clickhouse-server/
+      - ./init/:/docker-entrypoint-initdb.d/
+    ports: 
+      - 28123:8123 
+      - 29000:9000
+    networks:
+      dr_click:
+        ipv4_address: ${NETWORK_MASK}.4

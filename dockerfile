@@ -1,0 +1,4 @@
+ARG CLICKHOUSE_IMAGE
+FROM ${CLICKHOUSE_IMAGE}
+RUN apk add envsubst
+# USER root 
